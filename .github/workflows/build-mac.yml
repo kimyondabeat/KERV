@@ -1,0 +1,43 @@
+name: Build KERV for Mac (AU + VST3 + app)
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  mac:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (Apple Silicon + Intel)
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13
+
+      - name: Build
+        run: cmake --build build --config Release --parallel 4
+
+      - name: Sign (ad-hoc)
+        run: |
+          A=build/KERV_artefacts/Release
+          codesign --force --deep --sign - "$A/AU/KERV.component"
+          codesign --force --deep --sign - "$A/VST3/KERV.vst3"
+          codesign --force --deep --sign - "$A/Standalone/KERV.app"
+
+      - name: Validate the Audio Unit
+        run: |
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          cp -R build/KERV_artefacts/Release/AU/KERV.component ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar || true
+          sleep 3
+          auval -v aumu Kerv Kimy
+
+      - name: Make the installer (.pkg)
+        run: bash mac/make_pkg.sh build/KERV_artefacts/Release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KERV-v1.0-Mac
+          path: |
+            KERV_v1.0_Mac.pkg
+            build/KERV_artefacts/Release/AU/KERV.component
+            build/KERV_artefacts/Release/VST3/KERV.vst3
