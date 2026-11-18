@@ -39,6 +39,7 @@ jobs:
           }
           Push-Location installer
           makensis /V2 kerv.nsi
+          makensis /V2 /DNOADMIN "/DOUTFILE=..\KERV_v1.0_Setup_NoAdmin.exe" kerv.nsi
           Pop-Location
           Get-Item KERV_v1.0_Setup.exe | Select-Object Name, Length
 
@@ -54,6 +55,21 @@ jobs:
           if (Test-Path $app) { throw "Uninstall left $app" }
           Write-Host "Install and uninstall OK"
 
+      - name: Test the no-admin installer (as a normal user, no UAC)
+        shell: pwsh
+        run: |
+          $env:__COMPAT_LAYER = "RunAsInvoker"
+          Start-Process -Wait -FilePath .\KERV_v1.0_Setup_NoAdmin.exe -ArgumentList "/S"
+          $vst = "$env:LOCALAPPDATA\Programs\Common\VST3\KERV.vst3\Contents\x86_64-win\KERV.vst3"
+          $app = "$env:LOCALAPPDATA\Programs\KERV\KERV.exe"
+          foreach ($f in @($vst, $app)) { if (-not (Test-Path $f)) { throw "Missing after install: $f" } ; Write-Host "OK $f" }
+          $k = Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\KERV"
+          Write-Host "Registered:" $k.DisplayName
+          Start-Process -Wait -FilePath "$env:LOCALAPPDATA\Programs\KERV\Uninstall KERV.exe" -ArgumentList "/S"
+          Start-Sleep 3
+          if (Test-Path $app) { throw "Uninstall left $app" }
+          Write-Host "No-admin install and uninstall OK"
+
       - name: Zip (no installer)
         shell: pwsh
         run: Compress-Archive -Path stage/KERV -DestinationPath KERV_v1.0_Windows.zip
@@ -63,6 +79,7 @@ jobs:
           name: KERV-v1.0-Windows
           path: |
             KERV_v1.0_Setup.exe
+            KERV_v1.0_Setup_NoAdmin.exe
             KERV_v1.0_Windows.zip
 
       - name: Publish to the v1.0 release
@@ -72,4 +89,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view v1.0 >/dev/null 2>&1 || gh release create v1.0 --title "KERV v1.0" --notes "KERV - Kompa Drum Engine v1.0 by kimyondabeat. Windows: KERV_v1.0_Setup.exe. Mac: KERV_v1.0_Mac.pkg." || true
-          gh release upload v1.0 KERV_v1.0_Setup.exe KERV_v1.0_Windows.zip --clobber
+          gh release upload v1.0 KERV_v1.0_Setup.exe KERV_v1.0_Setup_NoAdmin.exe KERV_v1.0_Windows.zip --clobber

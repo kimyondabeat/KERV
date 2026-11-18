@@ -17,8 +17,19 @@ Name "${FULLNAME}"
   !define OUTFILE "..\KERV_v1.0_Setup.exe"
 !endif
 OutFile "${OUTFILE}"
-InstallDir "$PROGRAMFILES64\KERV"
-RequestExecutionLevel admin
+!ifdef NOADMIN
+  !define VST3SHOW "%LOCALAPPDATA%\Programs\Common\VST3"
+  !define VST3DIR "$LOCALAPPDATA\Programs\Common\VST3"
+  !define REGROOT HKCU
+  InstallDir "$LOCALAPPDATA\Programs\KERV"
+  RequestExecutionLevel user
+!else
+  !define VST3SHOW "C:\Program Files\Common Files\VST3"
+  !define VST3DIR "$COMMONFILES64\VST3"
+  !define REGROOT HKLM
+  InstallDir "$PROGRAMFILES64\KERV"
+  RequestExecutionLevel admin
+!endif
 SetCompressor /SOLID lzma
 BrandingText "KERV v1.0  -  by kimyondabeat"
 
@@ -44,7 +55,7 @@ VIAddVersionKey "LegalCopyright" "(c) ${COMPANY}"
 !define MUI_WELCOMEPAGE_TEXT "This will install KERV - Kompa Drum Engine v1.0 on your computer.$\r$\n$\r$\n- The KERV VST3 plugin, for any DAW that supports VST3 instruments$\r$\n- The KERV desktop app, to play KERV without a DAW$\r$\n$\r$\nClick Next to continue."
 !define MUI_COMPONENTSPAGE_SMALLDESC
 !define MUI_FINISHPAGE_TITLE "KERV is installed"
-!define MUI_FINISHPAGE_TEXT "Open your DAW and rescan your plugins to find KERV.$\r$\n$\r$\nThe VST3 plugin is in:$\r$\nC:\Program Files\Common Files\VST3\KERV.vst3"
+!define MUI_FINISHPAGE_TEXT "Open your DAW and rescan your plugins to find KERV.$\r$\n$\r$\nThe VST3 plugin is in:$\r$\n${VST3SHOW}\KERV.vst3"
 !define MUI_FINISHPAGE_RUN "$INSTDIR\KERV.exe"
 !define MUI_FINISHPAGE_RUN_TEXT "Open the KERV app now"
 
@@ -65,18 +76,26 @@ Function .onInit
     Abort
   ${EndIf}
   SetRegView 64
+!ifdef NOADMIN
+  SetShellVarContext current
+!else
   SetShellVarContext all
+!endif
 FunctionEnd
 
 Function un.onInit
   SetRegView 64
+!ifdef NOADMIN
+  SetShellVarContext current
+!else
   SetShellVarContext all
+!endif
 FunctionEnd
 
 Section "KERV VST3 plugin (for your DAW)" SecVST3
   SectionIn RO
-  SetOutPath "$COMMONFILES64\VST3"
-  RMDir /r "$COMMONFILES64\VST3\KERV.vst3"
+  SetOutPath "${VST3DIR}"
+  RMDir /r "${VST3DIR}\KERV.vst3"
   File /r "${SRC}\KERV.vst3"
 SectionEnd
 
@@ -98,19 +117,19 @@ Section "-Uninstaller"
   File "${SRC}\README.txt"
   File "kerv.ico"
   WriteUninstaller "$INSTDIR\Uninstall KERV.exe"
-  WriteRegStr HKLM "${UNINSTKEY}" "DisplayName" "${FULLNAME}"
-  WriteRegStr HKLM "${UNINSTKEY}" "DisplayVersion" "${VERSION}"
-  WriteRegStr HKLM "${UNINSTKEY}" "Publisher" "${COMPANY}"
-  WriteRegStr HKLM "${UNINSTKEY}" "DisplayIcon" "$INSTDIR\kerv.ico"
-  WriteRegStr HKLM "${UNINSTKEY}" "InstallLocation" "$INSTDIR"
-  WriteRegStr HKLM "${UNINSTKEY}" "UninstallString" '"$INSTDIR\Uninstall KERV.exe"'
-  WriteRegStr HKLM "${UNINSTKEY}" "QuietUninstallString" '"$INSTDIR\Uninstall KERV.exe" /S'
-  WriteRegDWORD HKLM "${UNINSTKEY}" "NoModify" 1
-  WriteRegDWORD HKLM "${UNINSTKEY}" "NoRepair" 1
-  WriteRegDWORD HKLM "${UNINSTKEY}" "EstimatedSize" 72000
+  WriteRegStr ${REGROOT} "${UNINSTKEY}" "DisplayName" "${FULLNAME}"
+  WriteRegStr ${REGROOT} "${UNINSTKEY}" "DisplayVersion" "${VERSION}"
+  WriteRegStr ${REGROOT} "${UNINSTKEY}" "Publisher" "${COMPANY}"
+  WriteRegStr ${REGROOT} "${UNINSTKEY}" "DisplayIcon" "$INSTDIR\kerv.ico"
+  WriteRegStr ${REGROOT} "${UNINSTKEY}" "InstallLocation" "$INSTDIR"
+  WriteRegStr ${REGROOT} "${UNINSTKEY}" "UninstallString" '"$INSTDIR\Uninstall KERV.exe"'
+  WriteRegStr ${REGROOT} "${UNINSTKEY}" "QuietUninstallString" '"$INSTDIR\Uninstall KERV.exe" /S'
+  WriteRegDWORD ${REGROOT} "${UNINSTKEY}" "NoModify" 1
+  WriteRegDWORD ${REGROOT} "${UNINSTKEY}" "NoRepair" 1
+  WriteRegDWORD ${REGROOT} "${UNINSTKEY}" "EstimatedSize" 72000
 SectionEnd
 
-LangString DESC_VST3 ${LANG_ENGLISH} "Installs KERV.vst3 in C:\Program Files\Common Files\VST3. Required."
+LangString DESC_VST3 ${LANG_ENGLISH} "Installs KERV.vst3 in ${VST3SHOW}. Required."
 LangString DESC_APP ${LANG_ENGLISH} "The KERV desktop app, with a Start menu shortcut."
 LangString DESC_DESK ${LANG_ENGLISH} "Puts a KERV shortcut on your desktop."
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
@@ -120,7 +139,7 @@ LangString DESC_DESK ${LANG_ENGLISH} "Puts a KERV shortcut on your desktop."
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
 Section "Uninstall"
-  RMDir /r "$COMMONFILES64\VST3\KERV.vst3"
+  RMDir /r "${VST3DIR}\KERV.vst3"
   Delete "$INSTDIR\KERV.exe"
   Delete "$INSTDIR\kerv.ico"
   Delete "$INSTDIR\README.txt"
@@ -130,5 +149,5 @@ Section "Uninstall"
   Delete "$SMPROGRAMS\KERV\Uninstall KERV.lnk"
   RMDir "$SMPROGRAMS\KERV"
   Delete "$DESKTOP\KERV.lnk"
-  DeleteRegKey HKLM "${UNINSTKEY}"
+  DeleteRegKey ${REGROOT} "${UNINSTKEY}"
 SectionEnd
