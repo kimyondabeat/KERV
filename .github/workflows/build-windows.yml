@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   windows:
     runs-on: windows-latest
@@ -61,3 +64,12 @@ jobs:
           path: |
             KERV_v1.0_Setup.exe
             KERV_v1.0_Windows.zip
+
+      - name: Publish to the v1.0 release
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view v1.0 >/dev/null 2>&1 || gh release create v1.0 --title "KERV v1.0" --notes "KERV - Kompa Drum Engine v1.0 by kimyondabeat. Windows: KERV_v1.0_Setup.exe. Mac: KERV_v1.0_Mac.pkg." || true
+          gh release upload v1.0 KERV_v1.0_Setup.exe KERV_v1.0_Windows.zip --clobber
