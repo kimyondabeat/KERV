@@ -3,13 +3,17 @@ name: Build KERV for Mac (AU + VST3 + app)
 on:
   push:
   workflow_dispatch:
+    inputs:
+      runner:
+        description: "Mac runner"
+        default: "macos-15-intel"
 
 permissions:
   contents: write
 
 jobs:
   mac:
-    runs-on: macos-15-intel
+    runs-on: ${{ inputs.runner || 'macos-15-intel' }}
     steps:
       - uses: actions/checkout@v4
 
