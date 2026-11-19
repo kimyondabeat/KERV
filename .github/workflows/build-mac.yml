@@ -11,6 +11,10 @@ on:
 permissions:
   contents: write
 
+env:
+  # JUCE's helper tool (juceaide) is built without our deployment target; this keeps the new SDK happy
+  MACOSX_DEPLOYMENT_TARGET: "10.13"
+
 jobs:
   mac:
     runs-on: ${{ inputs.runner || 'macos-15-intel' }}
