@@ -1,0 +1,56 @@
+name: Build KERV for Pro Tools (AAX, unsigned)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  MACOSX_DEPLOYMENT_TARGET: "10.13"
+
+jobs:
+  aax:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+            configure: cmake -B build -A x64 -DKERV_AAX=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+          - os: macos-15-intel
+            name: Mac
+            configure: cmake -B build -DKERV_AAX=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: ${{ matrix.configure }}
+
+      - name: Build
+        run: cmake --build build --config Release --parallel 4 --target KERV_AAX
+
+      - name: Zip the AAX plugin
+        shell: bash
+        run: |
+          cd build/KERV_artefacts/Release/AAX
+          ls -la
+          if [ "${{ matrix.name }}" = "Mac" ]; then
+            codesign --force --deep --sign - KERV.aaxplugin
+            ditto -c -k --keepParent KERV.aaxplugin "$GITHUB_WORKSPACE/KERV_v1.0_AAX_unsigned_Mac.zip"
+          else
+            7z a -tzip "$GITHUB_WORKSPACE/KERV_v1.0_AAX_unsigned_Windows.zip" KERV.aaxplugin
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KERV-v1.0-AAX-${{ matrix.name }}
+          path: KERV_v1.0_AAX_unsigned_*.zip
+
+      - name: Publish to the v1.0 release
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload v1.0 KERV_v1.0_AAX_unsigned_*.zip --clobber

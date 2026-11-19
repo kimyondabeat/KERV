@@ -253,7 +253,11 @@ void KitView::mouseMove (const juce::MouseEvent& e)
 juce::Rectangle<float> KitView::plusOf (int i) const
 {
     const auto r = boundsOf (i);
+   #if JUCE_MAJOR_VERSION >= 8
+    const float nameW = juce::GlyphArrangement::getStringWidth (font (15.0f, true), pieces[i].name);
+   #else
     const float nameW = font (15.0f, true).getStringWidthFloat (pieces[i].name);
+   #endif
     return juce::Rectangle<float> (18.0f, 18.0f).withCentre ({ r.getCentreX() + nameW * 0.5f + 16.0f, r.getBottom() + 17.0f });
 }
 

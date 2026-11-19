@@ -5,10 +5,17 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # JUCE is downloaded automatically, unless you point FETCHCONTENT_SOURCE_DIR_JUCE at a local copy.
+# Pro Tools (AAX): cmake -DKERV_AAX=ON uses JUCE 8, which ships the AAX SDK.
+option(KERV_AAX "Build the AAX plugin for Pro Tools (needs JUCE 8)" OFF)
+if(KERV_AAX)
+    set(KERV_JUCE_TAG "8.0.17-security" CACHE STRING "JUCE version")
+else()
+    set(KERV_JUCE_TAG "7.0.12" CACHE STRING "JUCE version")
+endif()
 include(FetchContent)
 FetchContent_Declare(JUCE
     GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
-    GIT_TAG        7.0.12
+    GIT_TAG        ${KERV_JUCE_TAG}
     GIT_SHALLOW    TRUE)
 FetchContent_MakeAvailable(JUCE)
 
@@ -16,6 +23,9 @@ FetchContent_MakeAvailable(JUCE)
 set(KERV_FORMATS VST3 Standalone)
 if(APPLE)
     list(APPEND KERV_FORMATS AU)
+endif()
+if(KERV_AAX)
+    set(KERV_FORMATS AAX)
 endif()
 
 juce_add_plugin(KERV
@@ -26,6 +36,7 @@ juce_add_plugin(KERV
     PLUGIN_CODE                 Kerv
     FORMATS                     ${KERV_FORMATS}
     AU_MAIN_TYPE                kAudioUnitType_MusicDevice
+    AAX_CATEGORY                AAX_ePlugInCategory_SWGenerators
     BUNDLE_ID                   com.kimyondabeat.kerv
     IS_SYNTH                    TRUE
     NEEDS_MIDI_INPUT            TRUE
