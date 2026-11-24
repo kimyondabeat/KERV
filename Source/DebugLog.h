@@ -17,11 +17,15 @@
 
 namespace kervdbg
 {
-    inline std::mutex& logMutex() { static std::mutex m; return m; }
+    inline std::recursive_mutex& logMutex() { static std::recursive_mutex m; return m; }
+    inline bool& inLog() { static thread_local bool b = false; return b; }
 
     inline void log (const char* msg)
     {
-        std::lock_guard<std::mutex> lock (logMutex());
+        if (inLog())
+            return;   // never re-enter (an exception while writing must not block)
+        inLog() = true;
+        std::lock_guard<std::recursive_mutex> lock (logMutex());
         char path[MAX_PATH] {};
         const char* tmp = std::getenv ("TEMP");
         std::snprintf (path, sizeof (path), "%s\\KERV_log.txt", tmp != nullptr ? tmp : "C:\\Users\\Public");
@@ -31,12 +35,18 @@ namespace kervdbg
                           (unsigned long) GetCurrentThreadId(), msg);
             std::fclose (f);
         }
+        inLog() = false;
     }
 
     inline LONG CALLBACK onException (PEXCEPTION_POINTERS info)
     {
+        const auto code = (unsigned long) info->ExceptionRecord->ExceptionCode;
+        // ignore harmless notifications (debug text, thread names)
+        if (inLog() || code == 0x40010006 || code == 0x4001000A || code == 0x406D1388)
+            return EXCEPTION_CONTINUE_SEARCH;
+
         static int count = 0;
-        if (++count > 40)
+        if (++count > 60)
             return EXCEPTION_CONTINUE_SEARCH;
 
         HMODULE mod = nullptr;
@@ -49,8 +59,8 @@ namespace kervdbg
         if (mod != nullptr) GetModuleFileNameA (mod, modName, MAX_PATH);
 
         char line[1024];
-        std::snprintf (line, sizeof (line), "EXCEPTION code=0x%08lX at %p (module %s, offset 0x%llX)%s",
-                       (unsigned long) info->ExceptionRecord->ExceptionCode, info->ExceptionRecord->ExceptionAddress,
+        std::snprintf (line, sizeof (line), "EXCEPTION code=0x%08lX%s at %p (module %s, offset 0x%llX)%s",
+                       code, code == 0xE06D7363 ? " (C++ throw)" : "", info->ExceptionRecord->ExceptionAddress,
                        modName,
                        (unsigned long long) ((const char*) info->ExceptionRecord->ExceptionAddress - (const char*) mod),
                        mod == self ? "  <-- inside KERV" : "");
