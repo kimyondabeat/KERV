@@ -1,3 +1,4 @@
+#include "DebugLog.h"
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
@@ -63,11 +64,17 @@ void Biquad::setPeak (double sampleRate, float freq, float q, float gainDb)
 }
 
 // ---------------------------------------------------------------------------
+#if KERV_DEBUG_LOG && defined (_WIN32)
+static kervdbg::Startup kervStartupLog;
+#endif
+
 KervProcessor::KervProcessor()
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       apvts (*this, nullptr, "KERV", createLayout())
 {
+    KERV_LOG ("ctor: parameters created, loading sound library");
     Library::get(); // decode the built-in sounds now, not on the audio thread
+    KERV_LOG ("ctor: sound library ready");
 
     for (int p = 0; p < numPads; ++p)
     {
@@ -83,18 +90,21 @@ KervProcessor::KervProcessor()
     }
     masterP = apvts.getRawParameterValue ("master");
 
+    KERV_LOG ("ctor: loading default kit");
     auto factory = Presets::factory();
     applyPresetXml (*factory.front());
     loadDefaultPattern();
     startTimerHz (2);
+    KERV_LOG ("ctor: done");
 }
 
-KervProcessor::~KervProcessor() { stopTimer(); }
+KervProcessor::~KervProcessor() { KERV_LOG ("destructor"); stopTimer(); }
 
 juce::AudioProcessorValueTreeState::ParameterLayout KervProcessor::createLayout()
 {
     using namespace juce;
     AudioProcessorValueTreeState::ParameterLayout layout;
+    KERV_LOG ("createLayout: start");
 
     auto releaseText = [] (float v, int) { return v >= 0.995f ? String ("Full")
                                                               : String (juce::roundToInt (10.0 * std::pow (400.0, (double) v))) + " ms"; };
@@ -135,11 +145,20 @@ juce::AudioProcessorValueTreeState::ParameterLayout KervProcessor::createLayout(
 
     layout.add (std::make_unique<AudioParameterFloat> (ParameterID { "master", 1 }, "Master",
                                                        NormalisableRange<float> (0.0f, 2.0f, 0.01f), 0.8f));
+    KERV_LOG ("createLayout: end");
     return layout;
 }
 
 bool KervProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
+   #if KERV_DEBUG_LOG && defined (_WIN32)
+    {
+        char line[200];
+        std::snprintf (line, sizeof (line), "isBusesLayoutSupported: in=%d ch, out=%d ch",
+                       layouts.getMainInputChannels(), layouts.getMainOutputChannels());
+        KERV_LOG (line);
+    }
+   #endif
     return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
 }
 
@@ -767,4 +786,19 @@ void KervProcessor::setStateInformation (const void* data, int sizeInBytes)
 
 juce::AudioProcessorEditor* KervProcessor::createEditor() { return new KervEditor (*this); }
 
-juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new KervProcessor(); }
+juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
+{
+    KERV_LOG ("createPluginFilter: start");
+   #if KERV_DEBUG_LOG
+    try
+    {
+        auto* p = new KervProcessor();
+        KERV_LOG ("createPluginFilter: ok");
+        return p;
+    }
+    catch (const std::exception& e) { KERV_LOG ("createPluginFilter: C++ exception:"); KERV_LOG (e.what()); throw; }
+    catch (...)                     { KERV_LOG ("createPluginFilter: unknown C++ exception"); throw; }
+   #else
+    return new KervProcessor();
+   #endif
+}

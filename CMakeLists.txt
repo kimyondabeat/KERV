@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # JUCE is downloaded automatically, unless you point FETCHCONTENT_SOURCE_DIR_JUCE at a local copy.
 # Pro Tools (AAX): cmake -DKERV_AAX=ON uses JUCE 8, which ships the AAX SDK.
 option(KERV_AAX "Build the AAX plugin for Pro Tools (needs JUCE 8)" OFF)
+option(KERV_DEBUG_LOG "Write a diagnostic log to %TEMP%\\KERV_log.txt (Windows test builds)" OFF)
 if(KERV_AAX)
     set(KERV_JUCE_TAG "8.0.17-security" CACHE STRING "JUCE version")
 else()
@@ -67,7 +68,14 @@ target_compile_definitions(KERV PUBLIC
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0
     JUCE_USE_MP3AUDIOFORMAT=1
-    JUCE_DISPLAY_SPLASH_SCREEN=0)
+    JUCE_DISPLAY_SPLASH_SCREEN=0
+    KERV_DEBUG_LOG=$<BOOL:${KERV_DEBUG_LOG}>)
+
+if(KERV_DEBUG_LOG AND MSVC)
+    # keep symbols so a crash address in the log can be turned into a function name
+    target_compile_options(KERV PRIVATE /Zi)
+    target_link_options(KERV PRIVATE /DEBUG /OPT:REF /OPT:ICF)
+endif()
 
 target_link_libraries(KERV
     PRIVATE

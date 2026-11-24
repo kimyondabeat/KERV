@@ -2,6 +2,11 @@ name: Build KERV for Pro Tools (AAX, unsigned)
 
 on:
   workflow_dispatch:
+    inputs:
+      debug_log:
+        description: "Test build with diagnostic log (Windows)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -17,7 +22,7 @@ jobs:
         include:
           - os: windows-latest
             name: Windows
-            configure: cmake -B build -A x64 -DKERV_AAX=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+            configure: cmake -B build -A x64 -DKERV_AAX=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DKERV_DEBUG_LOG=${{ inputs.debug_log && 'ON' || 'OFF' }}
           - os: macos-15-intel
             name: Mac
             configure: cmake -B build -DKERV_AAX=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13
@@ -43,14 +48,38 @@ jobs:
             7z a -tzip "$GITHUB_WORKSPACE/KERV_v1.0_AAX_unsigned_Windows.zip" KERV.aaxplugin
           fi
 
+      - name: Keep debug symbols
+        if: matrix.name == 'Windows' && inputs.debug_log
+        shell: bash
+        run: |
+          find build -name "*.pdb" | head
+          mkdir -p pdb && find build -name "KERV*.pdb" -exec cp {} pdb/ \;
+          cp build/KERV_artefacts/Release/AAX/KERV.aaxplugin/Contents/x64/KERV.aaxplugin pdb/
+          7z a -tzip KERV_AAX_debug_symbols.zip ./pdb/*
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.name == 'Windows' && inputs.debug_log
+        with:
+          name: KERV-AAX-debug-symbols
+          path: KERV_AAX_debug_symbols.zip
+
       - uses: actions/upload-artifact@v4
         with:
           name: KERV-v1.0-AAX-${{ matrix.name }}
           path: KERV_v1.0_AAX_unsigned_*.zip
 
       - name: Publish to the v1.0 release
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && ! inputs.debug_log
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload v1.0 KERV_v1.0_AAX_unsigned_*.zip --clobber
+
+      - name: Publish the diagnostic build
+        if: matrix.name == 'Windows' && inputs.debug_log
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp KERV_v1.0_AAX_unsigned_Windows.zip KERV_AAX_TEST_Windows.zip
+          gh release upload v1.0 KERV_AAX_TEST_Windows.zip --clobber

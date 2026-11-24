@@ -1,3 +1,4 @@
+#include "DebugLog.h"
 #include "Library.h"
 #include "BinaryData.h"
 
@@ -78,6 +79,7 @@ const Library& Library::get()
 
 Library::Library()
 {
+    KERV_LOG ("Library: decoding sounds");
     juce::AudioFormatManager fm;
     fm.registerBasicFormats();
 
